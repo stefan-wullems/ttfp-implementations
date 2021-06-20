@@ -1,0 +1,7 @@
+package ttfp
+
+depends = prelude, contrib
+
+sourcedir = "src"
+
+modules = All
