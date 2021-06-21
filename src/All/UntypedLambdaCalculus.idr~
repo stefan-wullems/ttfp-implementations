@@ -137,8 +137,9 @@ mutual
     case t1 of
       Variable x => 
         case t2 of
-          Variable v' => 
-            rewrite elemSingleton t1SubT2 in t2SubT3
+          Variable v' =>
+            case t3 of
+              cases => ?blabjbajk
 
           Application t1' t2' => 
             applicationIH t1SubT2 t2SubT3 (No uninhabited)
