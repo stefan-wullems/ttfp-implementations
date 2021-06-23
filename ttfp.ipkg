@@ -4,4 +4,4 @@ depends = prelude, contrib
 
 sourcedir = "src"
 
-modules = All
+modules = UntypedLambdaCalculus, UntypedLambdaCalculus.Subterm

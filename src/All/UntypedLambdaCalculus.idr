@@ -1,13 +1,16 @@
 module All.UntypedLambdaCalculus
 
 import Data.List.Elem
+import Data.OneOf
 import Data.List.Elem.Extra
 import Decidable.Equality
 
-data Term 
-  = Variable String
-  | Application Term Term
-  | Abstraction String Term
+data Term : Type where
+  Variable: (name: String) -> Term
+  Application: (fn: Term) -> (arg: Term) -> Term
+  Abstraction: (param: String) -> (body: Term) -> Term
+
+%name Term t1, t2, t3, t4, t5
 
 Uninhabited (Variable _      = Application _ _) where uninhabited Refl impossible
 Uninhabited (Variable _      = Abstraction _ _) where uninhabited Refl impossible
@@ -41,129 +44,199 @@ subterms var@(Variable x) = [var]
 subterms app@(Application x y) = app :: subterms x ++ subterms y
 subterms abs@(Abstraction x y) = abs :: subterms y
 
-isSubterm : (a: Term) -> (b: Term) -> Dec (Elem b (subterms a))  
-isSubterm a b = isElem b (subterms a)
+data Subterm: (subTerm, term: Term) -> Type where
+  Here: Subterm term term
+  ThereAppFn: (Subterm subTerm fn) -> Subterm subTerm (Application fn arg)
+  ThereAppArg: (Subterm subTerm arg) -> Subterm subTerm (Application fn arg)
+  ThereAbsBody: (Subterm subTerm body) -> Subterm subTerm (Abstraction param body)
 
-isSubtermReflexivity : (a: Term) -> Elem a (subterms a)
-isSubtermReflexivity a = 
-  case isSubterm a a of
-    Yes prf => prf
-    No contra => 
-      case a of
-        Variable x => Here
-        Application x y => Here
-        Abstraction x y => Here
+||| Decide whether a term is a subterm of another.
+isSubterm : (a, b: Term) -> Dec (Subterm a b)  
+isSubterm a b = 
+  case decEq a b of
+    Yes Refl =>
+      -- Because the subterm relation is reflexive, if `a` equals `b`, then it's a subterm of `b`.
+      Yes Here
 
-Uninhabited (Elem (Application t1 t2) (subterms (Variable v))) where
-  uninhabited heyy impossible
+    No aNeqB =>
+      case b of
+        Variable name =>
+          -- Given `a \= b` and `b = Variable name`, we know enough to say that `a` is not a subterm of `b`.  
+          -- `Variables` only have themselves as subterms.   
+          No (\Here => aNeqB Refl)
 
-Uninhabited (Elem (Abstraction v1 t2) (subterms (Variable v2))) where
-  uninhabited heyy impossible
+        Application fn arg =>
+          -- Given `a \= b` and `b = Application fn arg`. For `a` to be a subterm of `b` it must either be a subterm of `fn` or `arg`.
+          case isSubterm a fn of
+            Yes aSubFn =>
+              -- `a` was found to be a subterm of `fn`. Therefore it is also a subterm of `b`.
+              Yes (ThereAppFn aSubFn)
 
--- @Todo: can I get rid of this?
-elemNeqSingleton : Elem x [y] -> Not (x = y) -> Void
-elemNeqSingleton Here contra = contra Refl
-elemNeqSingleton { x, y} (There z) contra = absurd z
+            No aNsubFn =>
+              -- `a` is not a subterm of `fn`, but it can still be a subterm of `b` if it is a subterm of `arg`.
+              case isSubterm a arg of
+                 Yes aSubArg =>
+                   -- `a` was found to be a subterm of `arg`. Therefore it is also a subterm of `b`.
+                   Yes (ThereAppArg aSubArg)
 
--- @Todo: can I get rid of this?
-elemNeqHead : {ys: List a} -> Elem x (y :: ys) -> Not (x = y) -> Elem x ys
-elemNeqHead {ys = []} prf prfNeq = absurd $ elemNeqSingleton prf prfNeq
-elemNeqHead {ys = (z :: xs)} prf prfNeq = elemNeqHead prf prfNeq
+                 No aNsubArg =>
+                   -- We know enough to say that `a` is not a subterm of `b` because:
+                   No (\aSubB => 
+                    case aSubB of 
+                      Here =>
+                        -- `a` is not equal to `b`,
+                        aNeqB Refl
 
--- @Todo: can I get rid of this?
+                      ThereAppFn aSubFn =>
+                        -- nor is it a subterm of `fn`,
+                        aNsubFn aSubFn
+
+                      ThereAppArg aSubArg =>
+                        -- nor is it a subterm of `arg`.
+                        aNsubArg aSubArg 
+                   )  
+
+        Abstraction param body =>
+          -- Given `a \= b` and `b = Abstraction param body`. For `a` to be a subterm of `b` it must be a subterm of `body`. 
+          case isSubterm a body of
+            Yes aSubBody => 
+              -- `a` was found to be a subterm of `body`. Therefore it is also a subterm of `b`.
+              Yes (ThereAbsBody aSubBody)
+
+            No aNsubBody =>
+              -- We know enough to say that `a` is not a subterm of `b` because:
+              No (\aSubB => 
+                case aSubB of
+                  Here =>
+                    -- `a` is not equal to `b`,
+                    aNeqB Refl
+
+                  ThereAbsBody aSubBody =>
+                    -- nor is it a subterm of `body`.
+                    aNsubBody aSubBody
+              )
+
+subtermReflexivity : (term: Term) -> Subterm a a
+subtermReflexivity term  = Here 
+
+Uninhabited (Elem (Application t1 t2) (subterms (Variable v))) where uninhabited prf impossible
+Uninhabited (Elem (Abstraction v1 t2) (subterms (Variable v2))) where uninhabited prf impossible
+
 elemSingleton : Elem x [x'] -> x = x'
 elemSingleton Here = Refl
 elemSingleton (There y) = absurd y
 
-abstractionSubterm : {t: Term} -> Elem (Abstraction v t') (subterms t) -> Elem t' (subterms t)
-abstractionSubterm {t = Variable y} x impossible
-abstractionSubterm {t = Application y z} (There x) =
-  case elemAppLorR (subterms y) (subterms z) x of
-    Left appSubY => 
-      There (elemAppLeft (subterms y) (subterms z) (abstractionSubterm appSubY))
-       
-    Right appSubZ =>
-      There (elemAppRight (subterms y) (subterms z) (abstractionSubterm appSubZ))
+--termElemSubtermElem : {parentTerm, term, subTerm: Term} -> 
+--                      { auto subtermCase: Subterm term subTerm } -> 
+--                      Elem term (subterms parentTerm) -> 
+--                      Elem subTerm (subterms parentTerm)
+--termElemSubtermElem {parentTerm, term, subTerm} t1SubT2 {subtermCase} = ?blaaaa
 
-abstractionSubterm {t = Abstraction v t'} Here = There (isSubtermReflexivity t') 
-abstractionSubterm {t = Abstraction x y} (There z) = There (abstractionSubterm z)
+--abstractionSubterm : {t1, t2: Term} -> 
+--                     {auto t1Abs: t1 = Abstraction t1Param t1Body} -> 
+--                     Elem t1 (subterms t2) -> Elem t1Body (subterms t2)
+--abstractionSubterm {t1 = Abstraction t1Param t1Body, t2} {t1Abs=Refl} t1SubT2 =
+--  case t2 of
+--    Variable name =>
+--       -- An Abstraction cannot be a subterm of a Variable because variables have no subterms other than themselves.             
+--      absurd t1SubT2
 
-applicationSubterm : {t: Term} -> Elem (Application t1' t2') (subterms t) -> (Elem t1' (subterms t), Elem t2' (subterms t))
-applicationSubterm {t = Variable y} x impossible 
-applicationSubterm {t = Application t1' t2'} Here = 
-  ( There (elemAppLeft (subterms t1') (subterms t2') (isSubtermReflexivity t1')) 
-  , There (elemAppRight (subterms t1') (subterms t2') (isSubtermReflexivity t2'))
-  ) 
-applicationSubterm {t = Application y z} (There x) = 
-  case elemAppLorR (subterms y) (subterms z) x of
-    Left w => 
-      let (t1SubY, t2SubY) = applicationSubterm w
-      in 
-        ( There (elemAppLeft (subterms y) (subterms z) t1SubY) 
-        , There (elemAppLeft (subterms y) (subterms z) t2SubY)
-        )
+--    Application fn arg =>
+--      case t1SubT2 of
+--        There t1SubFnOrArg =>
+--          case elemAppLorR _ _ t1SubFnOrArg of
+--            Left appSubFn => 
+--              There $ elemAppLeft _ _ (abstractionSubterm appSubFn)
+--       
+--            Right appSubArg =>
+--              There $ elemAppRight _ _ (abstractionSubterm appSubArg)
+--
+--    Abstraction t2Param t2Body =>
+--      case t1SubT2 of
+--        Here =>
+--          There $ subtermReflexivity t2Body
+--
+--        There t1SubT2Body =>
+--          There $ abstractionSubterm t1SubT2Body
+--
+--applicationSubtermHelp : {t, t1, t2: Term} -> 
+--                         { auto t1App: t1 = Application t1Fn t1Arg } -> 
+--                         { auto tFnOrArg: Either (t = t1Fn) (t = t1Arg) } ->
+--                         Elem t1 (subterms t2) -> 
+--                         Elem t (subterms t2)
+--applicationSubtermHelp {t1 = Application t1Fn t1Arg, t2} {t1App=Refl} {tFnOrArg} t1SubT2 = 
+--  case t2 of
+--    Variable name =>
+--      -- An Application cannot be a subterm of a Variable because variables have no subterms other than themselves. 
+--      absurd t1SubT2
+--      
+--    Application t2Fn t2Arg =>
+--      case t1SubT2 of
+--        Here =>
+--          -- In this case t1 = t2, so now we show that t is a subterm to t1.
+----------          case tFnOrArg of
+--            Left Refl => 
+--              There $ elemAppLeft _ _ (subtermReflexivity t2Fn)
+--      
+--            Right Refl => 
+--              There $ elemAppRight _ _ (subtermReflexivity t2Arg)
+--        
+--        There t1SubT2FnOrArg =>
+--          -- In this case, t1 can be found somewhere later in the subterms of t2. 
+--          case elemAppLorR _ _ t1SubT2FnOrArg of
+--            Left t1SubT2Fn =>
+--              There $ elemAppLeft _ _ (applicationSubtermHelp t1SubT2Fn)
 
-    Right w => 
-     let (t1SubZ, t2SubZ) = applicationSubterm w
-     in 
-       ( There (elemAppRight (subterms y) (subterms z) t1SubZ) 
-       , There (elemAppRight (subterms y) (subterms z) t2SubZ)
-       )
+--            Right t1SubT2Arg =>
+--              There $ elemAppRight _ _ (applicationSubtermHelp t1SubT2Arg) 
 
-applicationSubterm {t = Abstraction y z} (There x) = bimap There There (applicationSubterm x) 
+--    Abstraction name body =>
+--      case t1SubT2 of
+--        There t1SubT =>
+--          -- (t1 \= t2) because t2 is an Abstraction. Therefore t1 must be in the subterms of t2.
+--          There $ applicationSubtermHelp t1SubT
+--
+--applicationSubterm : {t1, t2: Term} -> {auto t1App: t1 = Application t1Fn t1Arg} -> Elem t1 (subterms t2) -> (Elem t1Fn (subterms t2), Elem t1Arg (subterms t2))
+--applicationSubterm appSubT2 {t1App=Refl} = 
+--  ( applicationSubtermHelp {t=t1Fn} appSubT2
+--  , applicationSubtermHelp {t=t1Arg} appSubT2
+--  )
 
-mutual
-  abstractionIH : {t1, t2, t3: Term} -> {auto prfAbstraction: t2 = Abstraction _ _} -> Elem t1 (subterms t2) -> Elem t2 (subterms t3) -> Dec (t1 = t2) -> Elem t1 (subterms t3)
-  abstractionIH {prfAbstraction=Refl} t1SubAbs absSubT2 (Yes Refl) = absSubT2
-  abstractionIH {prfAbstraction=Refl} t1SubAbs absSubT2 (No contra) = 
-    let t1SubT = elemNeqHead t1SubAbs contra
-        tSubT3 = abstractionSubterm absSubT2
-    in subtermElemTransitivity t1SubT tSubT3
+--subtermElemTransitivity : {t1, t2, t3: Term} -> Elem t1 (subterms t2) -> Elem t2 (subterms t3) -> Elem t1 (subterms t3)
+--subtermElemTransitivity {t1, t2, t3} t1SubT2 t2SubT3 = 
+--  case t2 of
+--    Variable x =>
+--      case t1 of
+--        Variable v' => 
+--          rewrite elemSingleton t1SubT2 in t2SubT3
+--
+--        Application t1' t2' =>
+--          -- An Application cannot be a subterm of a Variable because variables have no subterms other than themselves. 
+--          absurd t1SubT2
+--
+--        Abstraction v' t' =>
+--          -- An Abstraction cannot be a subterm of a Variable because variables have no subterms other than themselves. 
+--          absurd t1SubT2
+--
+--    Application x y =>
+--      case t1SubT2 of
+--        Here =>
+--         t2SubT3
+--
+--        There t1SubT2FnOrArg =>
+--          let (t2FnSubT3, t2ArgSubT3) = applicationSubterm t2SubT3
+--          in 
+--            case elemAppLorR _ _ t1SubT2FnOrArg of
+--              Left t1SubT2Fn => 
+--                subtermElemTransitivity t1SubT2Fn t2FnSubT3   
+--        
+--              Right t1SubT2Arg => 
+--                subtermElemTransitivity t1SubT2Arg t2ArgSubT3
 
-  applicationIH : {t1, t2, t3: Term} -> {auto prfApplication: t2 = Application ap1 ap2} -> Elem t1 (subterms t2) -> Elem t2 (subterms t3) -> Dec (t1 = t2) -> Elem t1 (subterms t3)
-  applicationIH {prfApplication=Refl} t1SubT2 t2SubT3 (Yes Refl) = t2SubT3
-  applicationIH {prfApplication=Refl} t1SubT2 t2SubT3 (No contra) = 
-    let (ap1SubT3, ap2SubT3) = applicationSubterm t2SubT3
-    in 
-      case elemAppLorR (subterms ap1) (subterms ap2) (elemNeqHead t1SubT2 contra) of
-        Left t1SubAp1 => 
-          subtermElemTransitivity t1SubAp1 ap1SubT3   
-        
-        Right t1SubAp2 => 
-          subtermElemTransitivity t1SubAp2 ap2SubT3
+--    Abstraction param body =>
+--      case t1SubT2 of
+--        Here =>
+--          t2SubT3
 
-  subtermElemTransitivity : {t1, t2, t3: Term} -> Elem t1 (subterms t2) -> Elem t2 (subterms t3) -> Elem t1 (subterms t3)
-  subtermElemTransitivity {t1, t2, t3} t1SubT2 t2SubT3 = 
-    case t1 of
-      Variable x => 
-        case t2 of
-          Variable v' => 
-            rewrite elemSingleton t1SubT2 in t2SubT3
-
-          Application t1' t2' => 
-            applicationIH t1SubT2 t2SubT3 (No uninhabited)
-
-          Abstraction v' t' => 
-            abstractionIH t1SubT2 t2SubT3 (No uninhabited)
-
-      Application x y => 
-        case t2 of
-          Variable v' => 
-            absurd t1SubT2
-        
-          Application t1' t2' =>
-            applicationIH t1SubT2 t2SubT3 (decEq (Application x y) t2)
-
-          Abstraction v' t' =>
-            abstractionIH t1SubT2 t2SubT3 (No uninhabited)
-
-      Abstraction x y => 
-        case t2 of
-          Variable v =>
-            absurd t1SubT2
-        
-          Application t1' t2' => 
-            applicationIH t1SubT2 t2SubT3 (No uninhabited)
-
-          Abstraction v' t' => 
-            abstractionIH t1SubT2 t2SubT3 (decEq (Abstraction x y) t2)
+--        There t1SubT =>
+--          subtermElemTransitivity t1SubT (abstractionSubterm t2SubT3)
