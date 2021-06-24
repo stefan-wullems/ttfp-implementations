@@ -22,7 +22,7 @@ Uninhabited (Subterm (Application _ _) (Variable _)) where uninhabited prf impos
 public export
 Uninhabited (Subterm (Abstraction _ _) (Variable _)) where uninhabited prf impossible
 
-||| A term is a subterm of itself
+||| A term is a subterm of itself.
 public export
 subtermReflexivity : (term: Term) -> Subterm a a
 subtermReflexivity term = Here 
