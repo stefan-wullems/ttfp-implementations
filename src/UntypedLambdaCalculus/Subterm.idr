@@ -114,6 +114,11 @@ isSubterm a b =
                     aNsubBody aSubBody
               )
 
+||| A proper subterm is a subterm for which `a \= b`.
+isProperSubterm : Subterm a b -> Bool
+isProperSubterm Here = False
+isProperSubterm prf = True
+
 ||| Given a proof that `a` is a subterm of `b` and a proof that `c` is a subterm of `a`,
 ||| derive a proof that `c`, the subterm of `a`, is also a subterm of `b`.
 public export
