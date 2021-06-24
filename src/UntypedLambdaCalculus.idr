@@ -23,24 +23,32 @@ Uninhabited (Abstraction _ _ = Variable _     ) where uninhabited Refl impossibl
 public export
 Uninhabited (Abstraction _ _ = Application _ _) where uninhabited Refl impossible
 
--- @TODO cleanup
 public export
 DecEq Term where
-  decEq (Variable x) (Variable y) = 
-    case decEq x y of
-      Yes Refl => Yes Refl
-      No contra => No (\Refl => contra Refl) 
-  decEq (Variable x) (Application y z) = No absurd
-  decEq (Variable x) (Abstraction y z) = No absurd
-  decEq (Application x y) (Variable z) = No absurd
-  decEq (Application x y) (Application z w) = 
-    case decEq (x, y) (z, w) of
-      Yes Refl => Yes Refl
-      No contra => No (\Refl => contra Refl)
-  decEq (Application x y) (Abstraction z w) = No absurd
-  decEq (Abstraction x y) (Variable z) = No absurd
-  decEq (Abstraction x y) (Application z w) = No absurd
-  decEq (Abstraction x y) (Abstraction z w) = 
-    case decEq (x, y) (z, w) of
-      Yes Refl => Yes Refl
-      No contra => No (\Refl => contra Refl)
+  decEq (Variable name) (Variable name') = 
+    case decEq name name' of
+      Yes Refl => 
+        Yes Refl
+
+      No nameNeq => 
+        No (\Refl => nameNeq Refl) 
+  decEq (Variable name) (Application fn arg) = No absurd
+  decEq (Variable name) (Abstraction param body) = No absurd
+  decEq (Application fn arg) (Variable name) = No absurd
+  decEq (Application fn arg) (Application fn' arg') = 
+    case decEq (fn, arg) (fn', arg') of
+      Yes Refl => 
+        Yes Refl
+
+      No appNeq => 
+        No (\Refl => appNeq Refl)
+  decEq (Application fn arg) (Abstraction param body) = No absurd
+  decEq (Abstraction param body) (Variable name) = No absurd
+  decEq (Abstraction param body) (Application fn arg) = No absurd
+  decEq (Abstraction param body) (Abstraction param' body') = 
+    case decEq (param, body) (param', body') of
+      Yes Refl => 
+        Yes Refl
+
+      No absNeq => 
+        No (\Refl => absNeq Refl)
