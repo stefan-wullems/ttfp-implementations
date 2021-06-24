@@ -52,3 +52,14 @@ DecEq Term where
 
       No absNeq => 
         No (\Refl => absNeq Refl)
+
+public export
+Eq Term where
+  (==) t1 t2 = 
+    case decEq t1 t2 of
+      Yes prf => 
+        True
+      
+      No t1NeqT2 =>
+        False
+

@@ -4,11 +4,31 @@ import Decidable.Equality
 
 import public UntypedLambdaCalculus
 
+||| List the subterms of a term.
 public export
-subterms : Term -> List Term
-subterms var@(Variable x) = [var]
-subterms app@(Application x y) = app :: subterms x ++ subterms y
-subterms abs@(Abstraction x y) = abs :: subterms y
+listSubterms : Term -> List Term
+listSubterms var@(Variable name) = [var]
+listSubterms app@(Application fn arg) = app :: listSubterms fn ++ listSubterms arg
+listSubterms abs@(Abstraction param body) = abs :: listSubterms body
+
+||| How often does a term occur within another term?
+public export
+countOccurrences : (subterm: Term) -> (term: Term) -> Nat
+countOccurrences subterm term@(Variable name) = if term == subterm then 1 else 0
+countOccurrences subterm term@(Application fn arg) = 
+  let subOccurrences = countOccurrences subterm fn + countOccurrences subterm arg
+  in 
+    if term == subterm then 
+      subOccurrences + 1 
+    else 
+      subOccurrences
+countOccurrences subterm term@(Abstraction param body) =
+  let subOccurrences = countOccurrences subterm body
+  in 
+    if term == subterm then
+       subOccurrences + 1
+    else
+       subOccurrences
 
 public export
 data Subterm: (subTerm, term: Term) -> Type where
