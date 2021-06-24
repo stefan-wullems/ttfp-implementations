@@ -4,25 +4,31 @@ import Decidable.Equality
 
 import public UntypedLambdaCalculus
 
+public export
 subterms : Term -> List Term
 subterms var@(Variable x) = [var]
 subterms app@(Application x y) = app :: subterms x ++ subterms y
 subterms abs@(Abstraction x y) = abs :: subterms y
 
+public export
 data Subterm: (subTerm, term: Term) -> Type where
   Here: Subterm term term
   ThereAppFn: (Subterm subTerm fn) -> Subterm subTerm (Application fn arg)
   ThereAppArg: (Subterm subTerm arg) -> Subterm subTerm (Application fn arg)
   ThereAbsBody: (Subterm subTerm body) -> Subterm subTerm (Abstraction param body)
 
+public export
 Uninhabited (Subterm (Application _ _) (Variable _)) where uninhabited prf impossible
+public export
 Uninhabited (Subterm (Abstraction _ _) (Variable _)) where uninhabited prf impossible
 
 ||| A term is a subterm of itself
+public export
 subtermReflexivity : (term: Term) -> Subterm a a
 subtermReflexivity term = Here 
 
 ||| Decide whether a term is a subterm of another.
+public export
 isSubterm : (a, b: Term) -> Dec (Subterm a b)  
 isSubterm a b = 
   case decEq a b of
@@ -90,6 +96,7 @@ isSubterm a b =
 
 ||| Given a proof that `a` is a subterm of `b` and a proof that `c` is a subterm of `a`,
 ||| derive a proof that `c`, the subterm of `a`, is also a subterm of `b`.
+public export
 append: Subterm a b -> Subterm c a -> Subterm c b
 append Here prfB = prfB
 append (ThereAppFn later) prfB = ThereAppFn (append later prfB)
@@ -97,19 +104,23 @@ append (ThereAppArg later) prfB = ThereAppArg (append later prfB)
 append (ThereAbsBody later) prfB = ThereAbsBody (append later prfB)
 
 ||| If an `Application` is a subterm of some term, it's `fn`, is also a subterm of that term.
+public export
 appFnSubterm : Subterm (Application fn arg) term -> Subterm fn term
 appFnSubterm prf = append prf (ThereAppFn Here)
 
 ||| If an `Application` is a subterm of some term, it's `arg`, is also a subterm of that term.
+public export
 appArgSubterm : Subterm (Application fn arg) term -> Subterm arg term
 appArgSubterm prf = append prf (ThereAppArg Here)
 
 ||| If an `Abstraction` is a subterm of some term, it's `body`, is also a subterm of that term.
+public export
 absBodySubterm : Subterm (Abstraction param body) term -> Subterm body term
 absBodySubterm prf = append prf (ThereAbsBody Here)
 
 ||| Given a proof that `a` is a subterm of `b`, and a proof that `b` is a subterm of `c`,
 ||| derive a proof that `a` is also a subterm of `c`.
+public export
 subtermTransitivity : Subterm a b -> Subterm b c -> Subterm a c 
 subtermTransitivity aSubB bSubC =
  case aSubB of
