@@ -1,5 +1,6 @@
 module UntypedLambdaCalculus
 
+import Data.List
 import Decidable.Equality
 
 public export
@@ -89,4 +90,8 @@ countOccurrences subterm term@(Abstraction param body) =
     else
        subOccurrences
 
+freeVariables : Term -> List String
+freeVariables (Variable name) = [name]
+freeVariables (Application fn arg) = union (freeVariables fn) (freeVariables arg)
+freeVariables (Abstraction param body) = delete param (freeVariables body)
 

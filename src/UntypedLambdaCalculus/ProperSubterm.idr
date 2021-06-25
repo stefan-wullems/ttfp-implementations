@@ -44,15 +44,14 @@ fromSubterm (ThereAppFn subFn) aNeqB = ThereAppFn subFn
 fromSubterm (ThereAppArg subArg) aNeqB = ThereAppArg subArg
 fromSubterm (ThereAbsBody subBody) aNeqB = ThereAbsBody subBody
 
-||| A proper subterm can never be commutative because that would imply that it is reflexive.
+||| A proper subterm can never be commutative because that would require the relation to be reflexive.
 public export
 properSubtermNeverCommutative : ProperSubterm a b -> ProperSubterm b a -> Void
 properSubtermNeverCommutative aPsubB bPsubA = 
   let (Refl) = subtermEqualWhenCommutative (toSubterm aPsubB) (toSubterm bPsubA) 
   in properSubtermNeverReflexive aPsubB
 
-||| Given a proof that `a` is a proper subterm of `b`, 
-||| and a proof that `b` is a proper subterm of `c`,
+||| Given a proof that `a` is a proper subterm of `b` and a proof that `b` is a proper subterm of `c`,
 ||| derive a proof that `a` is also a proper subterm of `c`.
 public export
 properSubtermTransitivity : ProperSubterm a b -> ProperSubterm b c -> ProperSubterm a c
@@ -79,7 +78,7 @@ absBodyProperSubterm prf = properSubtermTransitivity (ThereAbsBody Here) prf
 public export
 isProperSubterm : (a, b: Term) -> Dec (ProperSubterm a b)
 isProperSubterm a b =
-  case a `isSubterm` b of
+  case a `isSubterm` b of 
     Yes aSubB =>
       case aSubB of
         Here =>

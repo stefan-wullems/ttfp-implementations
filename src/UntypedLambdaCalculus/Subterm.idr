@@ -2,7 +2,7 @@ module UntypedLambdaCalculus.Subterm
 
 import Decidable.Equality
 
-import public UntypedLambdaCalculus
+import UntypedLambdaCalculus
 
 %default total
 
