@@ -16,7 +16,7 @@ data Subterm: (subTerm, term: Term) -> Type where
 
 ||| A term is a subterm of itself.
 public export
-subtermReflexivity : (term: Term) -> Subterm a a
+subtermReflexivity : (a: Term) -> Subterm a a
 subtermReflexivity term = Here 
 
 ||| Given a proof that `a` is a subterm of `b`, and a proof that `b` is a subterm of `c`,
