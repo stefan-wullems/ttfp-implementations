@@ -1,4 +1,4 @@
-module UntypedLambdaCalculus.FreeVariableIn
+module UntypedLambdaCalculus.Variables
 
 import Decidable.Equality
 
