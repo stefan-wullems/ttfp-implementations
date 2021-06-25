@@ -7,7 +7,7 @@ import UntypedLambdaCalculus.Subterm
 
 %default total
 
-||| A proper subterm is similar to the subterm relation.
+||| The proper subterm relation is similar to the subterm relation.
 ||| The only difference is that is excludes reflexivity.
 public export
 data ProperSubterm : (subTerm, term: Term) -> Type where
@@ -29,7 +29,7 @@ properSubtermNeverReflexive termPsubSelf =
     ThereAbsBody absSubOwnBody =>
       absNeverSubOwnBody absSubOwnBody
 
-||| If `a` is a proper subterm of `b`, it is also a subterm of `b`.
+||| If `a` is a proper subterm of `b`, then it is also a subterm of `b`.
 public export
 toSubterm : ProperSubterm a b -> Subterm a b
 toSubterm (ThereAppFn subFn) = ThereAppFn subFn
@@ -135,8 +135,6 @@ appNeverPsubOwnArg appPsubOwnArg = appNeverSubOwnArg (toSubterm appPsubOwnArg)
 public export
 absNeverPsubOwnBody : ProperSubterm (Abstraction param body) body -> Void
 absNeverPsubOwnBody absPsubOwnBody = absNeverSubOwnBody (toSubterm absPsubOwnBody)
-
-
 
 public export
 Uninhabited (ProperSubterm term term) where uninhabited = properSubtermNeverReflexive
