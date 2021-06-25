@@ -7,7 +7,8 @@ import UntypedLambdaCalculus.Subterm
 
 %default total
 
-||| A proper subterm is equivalent to the subterm relation, excluding reflexivity. 
+||| A proper subterm is similar to the subterm relation.
+||| The only difference is that is excludes reflexivity.
 public export
 data ProperSubterm : (subTerm, term: Term) -> Type where
   ThereAppFn: (subFn: Subterm subTerm fn) -> ProperSubterm subTerm (Application fn arg)
@@ -53,9 +54,9 @@ properSubtermNeverCommutative aPsubB bPsubA =
 ||| derive a proof that `a` is also a proper subterm of `c`.
 public export
 properSubtermTransitivity : ProperSubterm a b -> ProperSubterm b c -> ProperSubterm a c
-properSubtermTransitivity aPsubB bPsubC = 
-  let aPsubC = subtermTransitivity (toSubterm aPsubB) (toSubterm bPsubC)
-  in fromSubterm aPsubC (\Refl => properSubtermNeverCommutative aPsubB bPsubC)
+properSubtermTransitivity aPsubB (ThereAppFn bSubFn) = ThereAppFn (subtermTransitivity (toSubterm aPsubB) bSubFn)
+properSubtermTransitivity aPsubB (ThereAppArg bSubArg) = ThereAppArg (subtermTransitivity (toSubterm aPsubB) bSubArg)
+properSubtermTransitivity aPsubB (ThereAbsBody bSubBody) = ThereAbsBody (subtermTransitivity (toSubterm aPsubB) bSubBody)
 
 ||| If an `Application` is a proper subterm of some term, it's `fn`, is also a proper subterm of that term.
 public export
