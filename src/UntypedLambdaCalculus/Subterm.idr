@@ -146,6 +146,20 @@ mutual
   absNeverSubOwnBody (ThereAppArg subArg) = appNeverSubOwnArg (absBodySubterm subArg)
   absNeverSubOwnBody (ThereAbsBody subBody) = absNeverSubOwnBody (absBodySubterm subBody)
 
+||| If the terms in the subterm relation can be swapped around then they must be equal.
+public export
+subtermEqualWhenCommutative : Subterm a b -> Subterm b a -> a = b
+subtermEqualWhenCommutative Here bSubA = Refl
+subtermEqualWhenCommutative (ThereAppFn subFn) bSubA =
+  let (Refl) = subtermEqualWhenCommutative subFn (appFnSubterm bSubA)
+  in absurd (appNeverSubOwnFn bSubA)  
+subtermEqualWhenCommutative (ThereAppArg subArg) bSubA = 
+  let (Refl) = subtermEqualWhenCommutative subArg (appArgSubterm bSubA)
+  in absurd (appNeverSubOwnArg bSubA)
+subtermEqualWhenCommutative (ThereAbsBody subBody) bSubA = 
+  let (Refl) = subtermEqualWhenCommutative subBody (absBodySubterm bSubA)
+  in absurd (absNeverSubOwnBody bSubA)
+
 public export
 Uninhabited (Subterm (Application _ _) (Variable _)) where uninhabited = appNeverSubVar
 public export
@@ -158,16 +172,3 @@ Uninhabited (Subterm (Application fn arg) arg) where uninhabited = appNeverSubOw
 public export
 Uninhabited (Subterm (Abstraction param body) body) where uninhabited = absNeverSubOwnBody
 
-||| If the terms in the subterm relation can be swapped around then they must be equal.
-public export
-subtermEqualWhenCommutative : Subterm a b -> Subterm b a -> a = b
-subtermEqualWhenCommutative Here bSubA = Refl
-subtermEqualWhenCommutative (ThereAppFn subFn) bSubA =
-  let (Refl) = subtermEqualWhenCommutative subFn (appFnSubterm bSubA)
-  in absurd bSubA  
-subtermEqualWhenCommutative (ThereAppArg subArg) bSubA = 
-  let (Refl) = subtermEqualWhenCommutative subArg (appArgSubterm bSubA)
-  in absurd bSubA
-subtermEqualWhenCommutative (ThereAbsBody subBody) bSubA = 
-  let (Refl) = subtermEqualWhenCommutative subBody (absBodySubterm bSubA)
-  in absurd bSubA

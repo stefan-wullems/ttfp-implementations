@@ -30,12 +30,14 @@ properSubtermNeverReflexive termPsubSelf =
       absNeverSubOwnBody absSubOwnBody
 
 ||| If `a` is a proper subterm of `b`, it is also a subterm of `b`.
+public export
 toSubterm : ProperSubterm a b -> Subterm a b
 toSubterm (ThereAppFn subFn) = ThereAppFn subFn
 toSubterm (ThereAppArg subArg) = ThereAppArg subArg
 toSubterm (ThereAbsBody subBody) = ThereAbsBody subBody
 
 ||| If `a` is a subterm of `b` and it is not equal to `b`, then it is a proper subterm.
+public export
 fromSubterm : Subterm a b -> (aNeqB: Not (a = b)) -> ProperSubterm a b
 fromSubterm Here aNeqB = absurd (aNeqB Refl)
 fromSubterm (ThereAppFn subFn) aNeqB = ThereAppFn subFn
@@ -77,7 +79,7 @@ absBodyProperSubterm prf = properSubtermTransitivity (ThereAbsBody Here) prf
 public export
 isProperSubterm : (a, b: Term) -> Dec (ProperSubterm a b)
 isProperSubterm a b =
-  case isSubterm a b of
+  case a `isSubterm` b of
     Yes aSubB =>
       case aSubB of
         Here =>
@@ -106,5 +108,47 @@ isProperSubterm a b =
             aNsubB (ThereAbsBody aSubBody)
       )
 
+||| Variables are the smallest terms and therefore an Application cannot be a proper subterm.
+public export
+appNeverPsubVar : ProperSubterm (Application _ _) (Variable _) -> Void
+appNeverPsubVar appPsubVar impossible
+
+||| Variables are the smallest terms and therefore an Abstraction cannot be a proper subterm.
+public export
+absNeverPsubVar : ProperSubterm (Abstraction _ _) (Variable _) -> Void
+absNeverPsubVar absPsubVar impossible
+
+||| An Application cannot be a proper subterm of its own `fn` because that would require
+||| an infinitely nested lambda expression.
+public export
+appNeverPsubOwnFn : ProperSubterm (Application fn arg) fn -> Void
+appNeverPsubOwnFn appPsubOwnFn = appNeverSubOwnFn (toSubterm appPsubOwnFn)
+
+||| An Application cannot be a subterm of its own `arg` because that would require
+||| an infinitely nested lamda expression. 
+public export
+appNeverPsubOwnArg : ProperSubterm (Application fn arg) arg -> Void
+appNeverPsubOwnArg appPsubOwnArg = appNeverSubOwnArg (toSubterm appPsubOwnArg)
+
+||| An Abstraction cannot be a subterm of its own `body` because that would require
+||| an infinitely nested lambda expression.
+public export
+absNeverPsubOwnBody : ProperSubterm (Abstraction param body) body -> Void
+absNeverPsubOwnBody absPsubOwnBody = absNeverSubOwnBody (toSubterm absPsubOwnBody)
+
+
+
 public export
 Uninhabited (ProperSubterm term term) where uninhabited = properSubtermNeverReflexive
+
+public export
+Uninhabited (ProperSubterm (Application _ _) (Variable _)) where uninhabited = appNeverPsubVar
+public export
+Uninhabited (ProperSubterm (Abstraction _ _) (Variable _)) where uninhabited = absNeverPsubVar
+
+public export
+Uninhabited (ProperSubterm (Application fn arg) fn) where uninhabited = appNeverPsubOwnFn
+public export
+Uninhabited (ProperSubterm (Application fn arg) arg) where uninhabited = appNeverPsubOwnArg
+public export
+Uninhabited (ProperSubterm (Abstraction param body) body) where uninhabited = absNeverPsubOwnBody
