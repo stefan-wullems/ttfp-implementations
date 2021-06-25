@@ -49,26 +49,24 @@ isSubterm : (a, b: Term) -> Dec (Subterm a b)
 isSubterm a b = 
   case decEq a b of
     Yes Refl =>
-      -- Because the subterm relation is reflexive, if `a` equals `b`, then it's a subterm of `b`.
       Yes (subtermReflexivity a)
 
     No aNeqB =>
       case b of
         Variable name =>
-          -- Given `a \= b` and `b = Variable name`, we know enough to say that `a` is not a subterm of `b`.  
           -- `Variables` only have themselves as subterms.   
           No (\Here => aNeqB Refl)
 
         Application fn arg =>
-          -- Given `a \= b` and `b = Application fn arg`. For `a` to be a subterm of `b` it must either be a subterm of `fn` or `arg`.
-          case isSubterm a fn of
+          -- `b` is an Application, so for `a` to be a subterm of `b` 
+          -- it must either be a subterm of the Application's `fn` or `arg`.
+          case a `isSubterm` fn of
             Yes aSubFn =>
               -- `a` was found to be a subterm of `fn`. Therefore it is also a subterm of `b`.
               Yes (ThereAppFn aSubFn)
 
             No aNsubFn =>
-              -- `a` is not a subterm of `fn`, but it can still be a subterm of `b` if it is a subterm of `arg`.
-              case isSubterm a arg of
+              case a `isSubterm` arg of
                  Yes aSubArg =>
                    -- `a` was found to be a subterm of `arg`. Therefore it is also a subterm of `b`.
                    Yes (ThereAppArg aSubArg)
@@ -91,8 +89,8 @@ isSubterm a b =
                    )  
 
         Abstraction param body =>
-          -- Given `a \= b` and `b = Abstraction param body`. For `a` to be a subterm of `b` it must be a subterm of `body`. 
-          case isSubterm a body of
+          -- `b` is an Abstraction, so for a to be a subterm of b, is must be a subterm of the Abstraction's body
+          case a `isSubterm` body of
             Yes aSubBody => 
               -- `a` was found to be a subterm of `body`. Therefore it is also a subterm of `b`.
               Yes (ThereAbsBody aSubBody)
