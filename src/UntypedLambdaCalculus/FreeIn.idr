@@ -1,4 +1,4 @@
-module UntypedLambdaCalculus.Variables
+module UntypedLambdaCalculus.FreeIn
 
 import Decidable.Equality
 
@@ -30,7 +30,7 @@ isFreeIn var term =
           Yes Here
 
         No nameNeq =>
-          -- A variable is obviously not bound in a lambda expression containing another variable.
+          -- A variable is obviously not bound in a lambda expression containing only another variable.
           No (\freeInTerm => neverFreeInVarWhenNameNeq freeInTerm nameNeq)
     
     Application fn arg =>

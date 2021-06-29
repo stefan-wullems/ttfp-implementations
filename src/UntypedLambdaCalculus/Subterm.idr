@@ -3,27 +3,25 @@ module UntypedLambdaCalculus.Subterm
 import Decidable.Equality
 
 import UntypedLambdaCalculus
+import UntypedLambdaCalculus.Quantifiers
 
 %default total
 
 ||| A path proof that a certain term is a subterm of a term.
 public export
-data Subterm: (subTerm, term: Term) -> Type where
-  Here: Subterm term term
-  ThereAppFn: (subFn: Subterm subTerm fn) -> Subterm subTerm (Application fn arg)
-  ThereAppArg: (subArg: Subterm subTerm arg) -> Subterm subTerm (Application fn arg)
-  ThereAbsBody: (subBody: Subterm subTerm body) -> Subterm subTerm (Abstraction param body)
+Subterm : (subTerm, term: Term) -> Type
+Subterm subTerm term = Any (\term' => subTerm = term') term 
 
 ||| A term is a subterm of itself.
 public export
 subtermReflexivity : (a: Term) -> Subterm a a
-subtermReflexivity term = Here 
+subtermReflexivity term = Here Refl 
 
 ||| Given a proof that `a` is a subterm of `b`, and a proof that `b` is a subterm of `c`,
 ||| derive a proof that `a` is also a subterm of `c`.
 public export
 subtermTransitivity : Subterm a b -> Subterm b c -> Subterm a c
-subtermTransitivity aSubB Here = aSubB
+subtermTransitivity aSubB (Here Refl) = aSubB
 subtermTransitivity aSubB (ThereAppFn bSubFn) = ThereAppFn (subtermTransitivity aSubB bSubFn)
 subtermTransitivity aSubB (ThereAppArg bSubArg) = ThereAppArg (subtermTransitivity aSubB bSubArg)
 subtermTransitivity aSubB (ThereAbsBody bSubBody) = ThereAbsBody (subtermTransitivity aSubB bSubBody)
@@ -31,99 +29,39 @@ subtermTransitivity aSubB (ThereAbsBody bSubBody) = ThereAbsBody (subtermTransit
 ||| If an `Application` is a subterm of some term, it's `fn`, is also a subterm of that term.
 public export
 appFnSubterm : Subterm (Application fn arg) term -> Subterm fn term
-appFnSubterm prf = subtermTransitivity (ThereAppFn Here) prf
+appFnSubterm prf = subtermTransitivity (ThereAppFn (Here Refl)) prf
 
 ||| If an `Application` is a subterm of some term, it's `arg`, is also a subterm of that term.
 public export
 appArgSubterm : Subterm (Application fn arg) term -> Subterm arg term
-appArgSubterm prf = subtermTransitivity (ThereAppArg Here) prf
+appArgSubterm prf = subtermTransitivity (ThereAppArg (Here Refl)) prf
 
 ||| If an `Abstraction` is a subterm of some term, it's `body`, is also a subterm of that term.
 public export
 absBodySubterm : Subterm (Abstraction param body) term -> Subterm body term
-absBodySubterm prf = subtermTransitivity (ThereAbsBody Here) prf
+absBodySubterm prf = subtermTransitivity (ThereAbsBody (Here Refl)) prf
 
 ||| Decide whether a term is a subterm of another.
 public export
 isSubterm : (a, b: Term) -> Dec (Subterm a b)  
-isSubterm a b = 
-  case decEq a b of
-    Yes Refl =>
-      Yes (subtermReflexivity a)
-
-    No aNeqB =>
-      case b of
-        Variable name =>
-          -- `Variables` only have themselves as subterms.   
-          No (\Here => aNeqB Refl)
-
-        Application fn arg =>
-          -- `b` is an Application, so for `a` to be a subterm of `b` 
-          -- it must either be a subterm of the Application's `fn` or `arg`.
-          case a `isSubterm` fn of
-            Yes aSubFn =>
-              -- `a` was found to be a subterm of `fn`. Therefore it is also a subterm of `b`.
-              Yes (ThereAppFn aSubFn)
-
-            No aNsubFn =>
-              case a `isSubterm` arg of
-                 Yes aSubArg =>
-                   -- `a` was found to be a subterm of `arg`. Therefore it is also a subterm of `b`.
-                   Yes (ThereAppArg aSubArg)
-
-                 No aNsubArg =>
-                   -- We know enough to say that `a` is not a subterm of `b` because:
-                   No (\aSubB => 
-                    case aSubB of 
-                      Here =>
-                        -- `a` is not equal to `b`,
-                        aNeqB Refl
-
-                      ThereAppFn aSubFn =>
-                        -- nor is it a subterm of `fn`,
-                        aNsubFn aSubFn
-
-                      ThereAppArg aSubArg =>
-                        -- nor is it a subterm of `arg`.
-                        aNsubArg aSubArg 
-                   )  
-
-        Abstraction param body =>
-          -- `b` is an Abstraction, so for a to be a subterm of b, is must be a subterm of the Abstraction's body
-          case a `isSubterm` body of
-            Yes aSubBody => 
-              -- `a` was found to be a subterm of `body`. Therefore it is also a subterm of `b`.
-              Yes (ThereAbsBody aSubBody)
-
-            No aNsubBody =>
-              -- We know enough to say that `a` is not a subterm of `b` because:
-              No (\aSubB => 
-                case aSubB of
-                  Here =>
-                    -- `a` is not equal to `b`,
-                    aNeqB Refl
-
-                  ThereAbsBody aSubBody =>
-                    -- nor is it a subterm of `body`.
-                    aNsubBody aSubBody
-              )
+isSubterm a b = any (decEq a) b 
 
 ||| Variables are the smallest terms and therefore an Application cannot be a subterm.
 public export
 appNeverSubVar : Subterm (Application _ _) (Variable _) -> Void
-appNeverSubVar appSubVar impossible
+appNeverSubVar (Here Refl) impossible
 
 ||| Variables are the smallest terms and therefore an Abstraction cannot be a subterm.
 public export
 absNeverSubVar : Subterm (Abstraction _ _) (Variable _) -> Void
-absNeverSubVar absSubVar impossible
+absNeverSubVar (Here Refl) impossible
 
 mutual
   ||| An Application cannot be a subterm of its own `fn` because that would require
   ||| an infinitely nested lambda expression.
   public export
   appNeverSubOwnFn : Subterm (Application fn arg) fn -> Void
-  appNeverSubOwnFn Here impossible
+  appNeverSubOwnFn (Here Refl) impossible
   appNeverSubOwnFn (ThereAppFn subFn) = appNeverSubOwnFn (appFnSubterm subFn)
   appNeverSubOwnFn (ThereAppArg subArg) = appNeverSubOwnArg (appFnSubterm subArg)
   appNeverSubOwnFn (ThereAbsBody subBody) = absNeverSubOwnBody (appFnSubterm subBody)
@@ -132,7 +70,7 @@ mutual
   ||| an infinitely nested lamda expression. 
   public export
   appNeverSubOwnArg : Subterm (Application fn arg) arg -> Void
-  appNeverSubOwnArg Here impossible
+  appNeverSubOwnArg (Here Refl) impossible
   appNeverSubOwnArg (ThereAppFn subFn) = appNeverSubOwnFn (appArgSubterm subFn)
   appNeverSubOwnArg (ThereAppArg subArg) = appNeverSubOwnArg (appArgSubterm subArg)
   appNeverSubOwnArg (ThereAbsBody subBody) = absNeverSubOwnBody (appArgSubterm subBody)
@@ -141,7 +79,7 @@ mutual
   ||| an infinitely nested lambda expression.
   public export
   absNeverSubOwnBody : Subterm (Abstraction param body) body -> Void
-  absNeverSubOwnBody Here impossible
+  absNeverSubOwnBody (Here Refl) impossible
   absNeverSubOwnBody (ThereAppFn subFn) = appNeverSubOwnFn (absBodySubterm subFn)
   absNeverSubOwnBody (ThereAppArg subArg) = appNeverSubOwnArg (absBodySubterm subArg)
   absNeverSubOwnBody (ThereAbsBody subBody) = absNeverSubOwnBody (absBodySubterm subBody)
@@ -149,7 +87,7 @@ mutual
 ||| If the terms in the subterm relation can be swapped around then they must be equal.
 public export
 subtermEqualWhenCommutative : Subterm a b -> Subterm b a -> a = b
-subtermEqualWhenCommutative Here bSubA = Refl
+subtermEqualWhenCommutative (Here Refl) bSubA = Refl
 subtermEqualWhenCommutative (ThereAppFn subFn) bSubA =
   let (Refl) = subtermEqualWhenCommutative subFn (appFnSubterm bSubA)
   in absurd (appNeverSubOwnFn bSubA)  
