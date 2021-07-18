@@ -3,6 +3,7 @@ module UntypedLambdaCalculus.FreeIn
 import Decidable.Equality
 
 import UntypedLambdaCalculus
+import UntypedLambdaCalculus.Subterm
 
 ||| A path proof that a certain variable is a free in some lamba expression.
 data FreeIn: (name: String) -> Term -> Type where
@@ -27,7 +28,7 @@ isFreeIn var term =
       case decEq var name of
         Yes Refl => 
           -- A variable is obviously bound in a lambda expression containing only that variable.
-          Yes Here
+          Yes (Here)
 
         No nameNeq =>
           -- A variable is obviously not bound in a lambda expression containing only another variable.
