@@ -5,107 +5,110 @@ import Data.List.Elem
 
 import Decidable.Equality
 
-import UntypedLambdaCalculus
-
-data SubtermPath : Term -> Term -> Type where
-  AppFn: SubtermPath (Application fn arg) fn
-  AppArg: SubtermPath (Application fn arg) arg
-  AbsBody: SubtermPath (Abstraction param body) body
-
-Uninhabited (SubtermPath (Variable name) term) where
-  uninhabited prf impossible
-
-testSubtermPaths : (term: Term) -> (len ** Vect len (term' ** SubtermPath term term'))  
-testSubtermPaths term = 
-  case term of
-    Variable name => 
-      (_ ** [])
-
-    Application fn arg => 
-      (_ ** [(_ ** AppFn), (_ ** AppArg)])
-
-    Abstraction param body => 
-      (_ ** [(_ ** AbsBody)])
-
-data ListPath : List a -> List a -> Type where
-  Tail: ListPath (x :: xs) xs 
-
 namespace Any
 
   ||| A proof that some subterm of a term satisfies a certain property.
   |||
-  ||| @ mkPath the type of the possible paths
-  ||| @ p the property to be satisfied
+  ||| @ next Return all possible paths for a given structure
+  ||| @ p The property to be satisfied
   public export
-  data Any : {0 pathType:_ } -> (next: (xs: as) -> List (xs': as ** pathType xs xs')) -> (p : as -> Type) -> as -> Type where
+  data Any : {pathType:_ } -> (next: (xs: as) -> List (xs': as ** pathType xs xs')) -> (p : as -> Type) -> as -> Type where
     ||| A proof that the satifsying term is the term we're currently examining.
-    Here: {0 pathType: _} -> {0 next: (xs: as) -> List (xs': as ** pathType xs xs')} -> (prf: p xs) -> Any next p xs
+    Here: {pathType: _} -> {0 next: (xs: as) -> List (xs': as ** pathType xs xs')} -> (prf: p xs) -> Any next p xs
     ||| A proof that the satisfying element is found somewhere later in the structure.
-    There: {0 pathType: _} -> 
+    There: {pathType: _} -> 
            {0 next: (xs:as) -> List (xs': as ** pathType xs xs')} -> 
            {0 p: as -> Type} -> 
            {xs, xs': _} ->
            (path: pathType xs xs') ->
-           Elem (xs' ** path) (next xs) -> 
+           {prfValidPath: Elem (xs' ** path) (next xs)} -> 
            (later: Any next p xs') -> 
            Any next p xs
 
   ||| Modify the property.
   export
-  mapProperty : (f: forall x . p x -> q x) -> Any next p xs -> Any next q xs
+  mapProperty : {pathType: _} -> 
+                {next: (xs: as) -> List (xs': as ** pathType xs xs')} -> 
+                (f: forall x . p x -> q x) -> 
+                Any next p xs -> 
+                Any next q xs
   mapProperty f (Here prf) = Here (f prf)
-  mapProperty f (There path inSubstructure later) = There path inSubstructure (mapProperty f later)
-  
-  any : {0 pathType: _} ->
-        (next: (xs: as) -> List (xs': as ** pathType xs xs')) -> 
-        (dec: (xs: as) -> Dec (p xs)) -> 
-        (xs: as) -> 
-        Dec (Any next p xs)
-  any next dec xs = anyHelp xs
-    where
-      anyHelp : (xs: as) -> Dec (Any next p xs)
-      anyHelp xs =
+  mapProperty f (There path {prfValidPath} later) = There path {prfValidPath} (mapProperty f later) 
+
+  ||| Decide if a certain property holds for any of the substructures of `xs`.
+  |||
+  ||| @next Traversal function
+  ||| @dec Decide if a property holds for a structure
+  ||| @xs Parent structure
+  export
+  any : {pathType: _} ->
+           (next: (xs: as) -> List (xs': as ** pathType xs xs')) -> 
+           (dec: (xs: as) -> Dec (p xs)) -> 
+           (xs: as) -> 
+           Dec (Any next p xs)
+  any next dec xs = existsHelp xs
+    where mutual
+      existsHelp : (xs: as) -> Dec (Any next p xs)
+      existsHelp xs =
         case dec xs of
-          Yes prf => 
-            Yes (Here prf)
+          -- The property holds for `xs`.
+          Yes prfProp => 
+            Yes (Here prfProp)
 
-          No notHere =>
-            case inSubstructure xs of
-               Yes (xs' ** path ** (isSubterm, prf)) =>
-                  Yes (There path isSubterm prf)
+          No contraProp =>
+            -- The propety does not hold for `xs`. 
+            -- Decide if it holds for any of the substructures of `xs`.
+            case decExistsInSubstructure xs of
+               -- The property is found to hold for one of the substructures of `xs`.
+               Yes (xs' ** path ** (prfValidPath, existsInSubstructurePrf)) =>
+                 Yes (There path {prfValidPath} existsInSubstructurePrf)
 
-               No notInSubstructure => 
-                 No (\prfSomewhere => 
-                   case prfSomewhere of
-                     Here prfHere => 
-                       notHere prfHere
+               -- The property does not hold for any of the substructures of `xs`.
+               No contraExistsInSubstructure =>   
+                 No (\existsPrf => 
+                   case existsPrf of
+                     Here prfProp => 
+                       contraProp prfProp
 
-                     There path isSubterm prfInSubstructure => 
-                       notInSubstructure (_ ** path ** (isSubterm, prfInSubstructure)) 
+                     There path {prfValidPath} existsInSubstructurePrf => 
+                       contraExistsInSubstructure (_ ** path ** (prfValidPath, existsInSubstructurePrf)) 
                  )
 
+      decExistsInSubstructure : (xs: as) -> Dec (xs': as ** path: pathType xs xs' ** (Elem (xs' ** path) (next xs), Any next p xs'))
+      decExistsInSubstructure xs = decExistsInSubstructureHelp (next xs)
         where
-          inSubstructure : (xs: as) -> Dec (xs': as ** path: pathType xs xs' ** (Elem (xs' ** path) (next xs), Any next p xs'))
-          inSubstructure xs = inSubstructureHelp (next xs)
-            where
-              inSubstructureHelp : (subterms: List (xs': as ** pathType xs xs')) -> Dec (xs': as ** path: pathType xs xs' ** (Elem (xs' ** path) subterms, Any next p xs'))
-              inSubstructureHelp [] = No (\(_ ** _ ** (prf, _)) => uninhabited prf)
-              inSubstructureHelp ((xs' ** path) :: paths) = 
-                case anyHelp xs' of
-                  Yes prf => 
-                    Yes (xs' ** path ** (Here, prf))
+          decExistsInSubstructureHelp : (subpaths: List (xs': as ** pathType xs xs')) -> 
+                                        Dec (xs': as ** path: pathType xs xs' ** (Elem (xs' ** path) subpaths, Any next p xs'))
+          decExistsInSubstructureHelp [] = No (\(_ ** _ ** (elemOfNextPrf, _)) => uninhabited elemOfNextPrf)
+          decExistsInSubstructureHelp ((xs' ** path) :: paths) = 
+            case existsHelp xs' of
+              -- The property holds for this substructure.
+              Yes prfExistsInThisSubstructure => 
+                Yes (xs' ** path ** (Here, prfExistsInThisSubstructure))
 
-                  No notInSubstructureXs' => 
-                    case inSubstructureHelp paths of
-                      Yes (xs'' ** path' ** (isSubterm, prf)) => 
-                        Yes (xs'' ** path' ** (There isSubterm, prf))
+              -- The property does not hold for this particular substructure.
+              -- Decide if it holds for any of the other substructures of `xs`.
+              No contraExistsInThisSubstructure =>
+                case decExistsInSubstructureHelp paths of
+                  -- The property holds for another substructure of `xs`.
+                  Yes (xs'' ** path' ** (prfValidPath, prfExistsInAnotherSubstructure)) => 
+                    Yes (xs'' ** path' ** (There prfValidPath, prfExistsInAnotherSubstructure))
 
-                      No notInSubstructureXs => 
-                        No (\(xs''''' ** path ** (prfInBla, whattPrf)) => 
-                         case prfInBla of
-                           Here => notInSubstructureXs' whattPrf
-                           There x => notInSubstructureXs (xs''''' ** path ** (x, whattPrf))
-                        )
+                  -- The property does not hold for any of the substructures of `xs`.
+                  No contraExistsInAnotherSubstructure => 
+                    No (\(xs'' ** path ** (prfValidPath, prfExistsInSubstructure)) => 
+                     case prfValidPath of
+                       Here => 
+                         contraExistsInThisSubstructure prfExistsInSubstructure
+
+                       There prfLaterInSubstructure => 
+                         contraExistsInAnotherSubstructure (xs'' ** path ** (prfLaterInSubstructure, prfExistsInSubstructure))
+                    )
+
+      
+
+        
+          
                                                                               
       
       

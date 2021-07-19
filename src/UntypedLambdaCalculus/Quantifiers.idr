@@ -2,6 +2,13 @@ module UntypedLambdaCalculus.Quantifiers
 
 import UntypedLambdaCalculus
 
+import PathProof
+
+data SubtermPath : Term -> Term -> Type where 
+  AppFn: SubtermPath (Application fn arg) fn 
+  AppArg: SubtermPath (Application fn arg) arg 
+  AbsBody: SubtermPath (Abstraction param body) body 
+
 namespace Any
 
   ||| A proof that some subterm of a term satisfies a certain property.
